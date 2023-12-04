@@ -8,7 +8,8 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
-from constants import BASE_DIR, MAIN_DOC_URL, MAIN_PEP_URL, EXPECTED_STATUS
+from constants import DOWNLOADS_DIR, MAIN_DOC_URL
+from constants import MAIN_PEP_URL, EXPECTED_STATUS
 from configs import configure_argument_parser, configure_logging
 from outputs import control_output
 from utils import get_response, find_tag
@@ -53,8 +54,6 @@ def latest_versions(session):
         if 'All versions' in ul.text:
             a_tags = ul.find_all('a')
             break
-    else:
-        raise Exception('Не найден список c версиями Python')
     results = [('Ссылка на документацию', 'Версия', 'Статус')]
     pattern = r'Python (?P<version>\d\.\d+) \((?P<status>.*)\)'
     for a_tag in a_tags:
@@ -83,9 +82,8 @@ def download(session):
     pdf_a4_link = pdf_a4_tag['href']
     archive_url = urljoin(downloads_url, pdf_a4_link)
     filename = archive_url.split('/')[-1]
-    downloads_dir = BASE_DIR / 'downloads'
-    downloads_dir.mkdir(exist_ok=True)
-    archive_path = downloads_dir / filename
+    DOWNLOADS_DIR.mkdir(exist_ok=True)
+    archive_path = DOWNLOADS_DIR / filename
     response = session.get(archive_url)
     with open(archive_path, 'wb') as file:
         file.write(response.content)
@@ -107,6 +105,7 @@ def pep(session):
         main_card_tag = find_tag(soup, 'section', {'id': 'pep-content'})
         main_card_dl_tag = find_tag(main_card_tag, 'dl',
                                     {'class': 'rfc2822 field-list simple'})
+        messages = []
         for tag in main_card_dl_tag:
             if tag.name == 'dt' and tag.text == 'Status:':
                 card_status = tag.next_sibling.next_sibling.string
@@ -115,16 +114,18 @@ def pep(session):
                 if len(peps_row[i].td.text) != 1:
                     table_status = peps_row[i].td.text[1:]
                     if card_status[0] != table_status:
-                        logging.info(
-                            '\n'
-                            'Несовпадающие статусы:\n'
-                            f'{pep_link}\n'
-                            f'Статус в карточке: {card_status}\n'
-                            f'Ожидаемые статусы: '
-                            f'{EXPECTED_STATUS[table_status]}\n'
-                                )
-    for key in count_status_in_card:
-        result.append((key, str(count_status_in_card[key])))
+                        messages.append('\n'
+                                        'Несовпадающие статусы:\n'
+                                        f'{pep_link}\n'
+                                        f'Статус в карточке: {card_status}\n'
+                                        f'Ожидаемые статусы: '
+                                        f'{EXPECTED_STATUS[table_status]}\n'
+                                        )
+                        message = '\n'.join(messages)
+    logging.warning((message))
+    result.extend(
+        [(key, str(count_status_in_card[key])) for key in count_status_in_card]
+        )
     result.append(('Total', len(peps_row)-1))
     return result
 
@@ -148,7 +149,11 @@ def main():
         session.cache.clear()
 
     parser_mode = args.mode
-    results = MODE_TO_FUNCTION[parser_mode](session)
+    try:
+        results = MODE_TO_FUNCTION[parser_mode](session)
+    except Exception as error:
+        logging.error(f'Произошла ошибка: {error}')
+        results = None
 
     if results is not None:
         control_output(results, args)
