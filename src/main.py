@@ -8,7 +8,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from tqdm import tqdm
 
-from constants import DOWNLOADS_DIR, MAIN_DOC_URL
+from constants import MAIN_DOC_URL, BASE_DIR
 from constants import MAIN_PEP_URL, EXPECTED_STATUS
 from configs import configure_argument_parser, configure_logging
 from outputs import control_output
@@ -82,8 +82,9 @@ def download(session):
     pdf_a4_link = pdf_a4_tag['href']
     archive_url = urljoin(downloads_url, pdf_a4_link)
     filename = archive_url.split('/')[-1]
-    DOWNLOADS_DIR.mkdir(exist_ok=True)
-    archive_path = DOWNLOADS_DIR / filename
+    downloads_dir = BASE_DIR / 'downloads'  # необходимо для pytest
+    downloads_dir.mkdir(exist_ok=True)
+    archive_path = downloads_dir / filename
     response = session.get(archive_url)
     with open(archive_path, 'wb') as file:
         file.write(response.content)
