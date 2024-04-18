@@ -44,3 +44,6 @@ file - сохраняет информацию в формате csv в папк
 ```
 python main.py [вариант парсера] -o file
 ```
+Автор | Почта
+------------- | -------------
+[Doomhunter190](https://github.com/DoomHunter190) | <small>[maximportnov9999@gmail.com](maximportnov9999@gmail.com)
